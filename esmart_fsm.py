@@ -12,8 +12,9 @@ TICK_SECS = 5
 FULL_VOLT = 28.4
 FULL_CUR = 20
 LOW_VOLT = 24.8
+DELAY_SECS = 300
 
-HOST='localhost'
+HOST='192.168.120.2'
 PORT=8888
 
 class esmartfsm(object):
@@ -42,8 +43,8 @@ class esmartfsm(object):
 
         charge_mode = esmart.DEVICE_MODE[data['chg_mode']]
         time_now = datetime.datetime.now().replace(microsecond=0).isoformat()
-        if ( charge_mode in ['CV', 'FLOAT'] ) or \
-           ( charge_mode == 'CC' and data['bat_volt'] == FULL_VOLT and d['chg_cur'] < FULL_CUR):
+        if ( charge_mode == 'FLOAT' ) or \
+           ( data['bat_volt'] >= FULL_VOLT and data['chg_cur'] < FULL_CUR):
             print('%s Charge mode: %s Battery %.1fV %.1fA - FULL' % (time_now, charge_mode, data['bat_volt'], data['chg_cur']))
             fsm.full()
         elif data['bat_volt'] < LOW_VOLT:
