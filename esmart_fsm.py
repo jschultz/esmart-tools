@@ -18,16 +18,15 @@ HOST='192.168.120.2'
 PORT=8888
 
 class esmartfsm(object):
-    states  = ['off', 'on', 'delayed']
+    states  = ['off', 'on']
 
     transitions = [
-        { 'trigger': 'full',    'source': 'off',     'dest': 'on',      'after': 'request_esmart_data' },
-        { 'trigger': 'full',    'source': 'on',      'dest': 'on',      'after': 'request_esmart_data' },
-        { 'trigger': 'low',     'source': 'on',      'dest': 'delayed', 'after': 'start_delay_timer'  },
-        { 'trigger': 'low',     'source': 'off',     'dest': 'off',     'after': 'request_esmart_data'  },
-        { 'trigger': 'timeout', 'source': 'delayed', 'dest': 'off',     'after': 'request_esmart_data' },
-        { 'trigger': 'tick',    'source': 'off',     'dest': 'off',     'after': 'request_esmart_data' },
-        { 'trigger': 'tick',    'source': 'on',      'dest': 'on',      'after': 'request_esmart_data' }
+        { 'trigger': 'full',    'source': 'off',     'dest': 'on',      'after': 'turn_pump_on' },
+        { 'trigger': 'full',    'source': 'on',      'dest': 'on' },
+        { 'trigger': 'low',     'source': 'on',      'dest': 'off',     'after': 'turn_pump_off_and_delay' },
+        { 'trigger': 'low',     'source': 'off',     'dest': 'off' },
+        { 'trigger': 'tick',    'source': 'off',     'dest': 'off' },
+        { 'trigger': 'tick',    'source': 'on',      'dest': 'on' }
     ]
 
     def __init__(self):
@@ -54,20 +53,18 @@ class esmartfsm(object):
             print('%s Charge mode: %s Battery %.1fV %.1fA - TICK' % (time_now, charge_mode, data['bat_volt'], data['chg_cur']))
             fsm.tick()
 
-    def start_delay_timer(self):
-        time.sleep(DELAY_SECS)
-        self.timeout()
-
-    def on_enter_on(self):
+    def turn_pump_on(self):
         print("TURN PUMP ON")
 
-    def off_delayed_on(self):
+    def turn_pump_off_and_delay(self):
         print("TURN PUMP OFF")
+        time.sleep(DELAY_SECS)
 
 def sigint_handler(sig, frame):
-        print('EXIT')
-        sys.exit(0)
+    print('EXIT')
+    sys.exit(0)
 
 signal.signal(signal.SIGINT, sigint_handler)
 fsm = esmartfsm()
-fsm.tick()
+while True:
+    fsm.request_esmart_data()
