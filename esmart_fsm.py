@@ -54,11 +54,11 @@ class esmartfsm(object):
 
         { 'source': 'waiting before stopping', 'trigger': 'full',     'dest': 'on', 'after': 'cancel_timer' },
         { 'source': 'waiting before stopping', 'trigger': 'low',      'dest': 'waiting before stopping' },
-        { 'source': 'waiting before stopping', 'trigger': 'critical', 'dest': 'waiting before restart low',    'after': 'turn_heat_pump_off' },
+        { 'source': 'waiting before stopping', 'trigger': 'critical', 'dest': 'stopping circulation pump low', 'after': 'turn_heat_pump_off' },
         { 'source': 'waiting before stopping', 'trigger': 'tick',     'dest': 'on', 'after': 'cancel_timer' },
         { 'source': 'waiting before stopping', 'trigger': 'hot',      'dest': 'stopping circulation pump hot', 'after': 'turn_heat_pump_off' },
         { 'source': 'waiting before stopping', 'trigger': 'cold',     'dest': 'waiting before stopping' },
-        { 'source': 'waiting before stopping', 'trigger': 'timeout',  'dest': 'waiting before restart low',    'after': 'turn_heat_pump_off' },
+        { 'source': 'waiting before stopping', 'trigger': 'timeout',  'dest': 'stopping circulation pump low', 'after': 'turn_heat_pump_off' },
 
         { 'source': 'stopping circulation pump low', 'trigger': 'full',     'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'low',      'dest': 'stopping circulation pump low' },
