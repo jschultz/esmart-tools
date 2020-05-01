@@ -101,8 +101,8 @@ class esmartfsm(object):
     ]
 
     def __init__(self):
-        self.e = esmart.esmart()
-        self.e.connect((ESMART_HOST, ESMART_PORT))
+        self.esmart = esmart.esmart()
+        self.esmart.connect((ESMART_HOST, ESMART_PORT))
 
 
         self.machine = Machine(model=self, states=esmartfsm.states, transitions=esmartfsm.transitions, initial='off')
@@ -145,20 +145,16 @@ class esmartfsm(object):
 
                     c = self.heattrap.read(1)
 
+            self.ticker -= time.time() - timebefore
             if tempsensors:
                 print(tempsensors, flush=True)
                 if tempsensors[1] >= HOT_DEGREES:
                     self.hot()
                 elif tempsensors[1] <= COLD_DEGREES:
                     self.cold()
-                else:
-                    self.tick()
             else:
-                self.ticker -= time.time() - timebefore
-                if self.ticker > 0:
-                    self.tick()
-                else:
-                    data = self.e.read()
+                if self.ticker <= 0:
+                    data = self.esmart.read()
 
                     charge_mode = esmart.DEVICE_MODE[data['chg_mode']]
                     time_now = datetime.datetime.now().replace(microsecond=0).isoformat()
@@ -166,8 +162,7 @@ class esmartfsm(object):
                     def print_charge_status(status):
                         print('%s Charge mode: %s Battery %.1fV %.1fA - %s' % (time_now, charge_mode, data['bat_volt'], data['chg_cur'], status), flush=True)
 
-                    if ( charge_mode == 'FLOAT' ) or \
-                    ( data['bat_volt'] >= FULL_VOLT and data['chg_cur'] < FULL_CUR):
+                    if ( charge_mode == 'CV' or data['bat_volt'] >= FULL_VOLT ) and data['chg_cur'] < FULL_CUR:
                         print_charge_status('FULL')
                         self.full()
                     elif data['bat_volt'] < CRITICAL_VOLT:
