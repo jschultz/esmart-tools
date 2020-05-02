@@ -14,6 +14,9 @@ LOAD_ON = b"\xaa\x01\x01\x02\x04\x04\x01\x00\xfd\x13\x39"
 
 DEVICE_MODE = ["IDLE", "CC", "CV", "FLOAT", "STARTING"]
 
+class esmartError(Exception):
+    pass
+
 class esmart:
     def __init__(self):
         self.state = STATE_START
@@ -56,9 +59,14 @@ class esmart:
                 self.socket.send(REQUEST_MSG0)
                 data = self.socket.recv(100)
 
-            assert data[0] == 0xaa, "Incorrect start character"
-            assert data[3] == 3,    "Source is not MPPT device"
-            assert data[4] == 0,    "Packet type is not 0"
+            if len(data) == 0:
+                raise esmartError("No data from eSmart device")
+            if (data[0] != 0xaa):
+                raise esmartError("Incorrect start character")
+            if (data[3] != 3):
+                raise esmartError("Source is not MPPT device")
+            if (data[4] != 0):
+                raise esmartError("Packet type is not 0")
 
             fields = {}
             fields['chg_mode']   = int.from_bytes(data[8:10],  byteorder='little')
@@ -77,7 +85,7 @@ class esmart:
             return fields
 
         except IOError:
-            print("Serial port error, fixing")
+            #print("Serial port error, fixing")
             self.serial.close()
             opened = 0
             while not opened:
@@ -91,5 +99,5 @@ class esmart:
                 except serial.serialutil.SerialException:
                     time.sleep(0.5)
                     self.serial.close()
-            print("Error fixed")
+            #print("Error fixed")
 

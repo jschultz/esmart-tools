@@ -12,6 +12,7 @@ import re
 import select
 import time
 import pifacedigitalio
+import traceback
 
 thermregexp = re.compile(r"THx,\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+)")
 
@@ -23,6 +24,7 @@ CRITICAL_VOLT = 24.0
 LOW_BATTERY_TIMEOUT = 120
 CIRCULATION_DELAY_SECS = 30
 RESTART_DELAY_SECS = 300
+RETRY_SLEEP_SECS = 30
 HOT_DEGREES = 50
 COLD_DEGREES = 45
 
@@ -38,27 +40,35 @@ ESMART_PORT=8888
 class esmartfsm(object):
     states  = ['off', 'on', 'waiting before stopping', 'stopping circulation pump low', 'waiting before restart low', 'stopping circulation pump hot', 'waiting before restart hot', 'hot']
     transitions = [
-        { 'source': 'off', 'trigger': 'full',     'dest': 'on', 'after': 'turn_pumps_on' },
+        { 'source': 'off', 'trigger': 'full',     'dest': 'starting circulation pump', 'after': ['turn_heat_pump_on', 'set_circulation_delay_timer'] },
         { 'source': 'off', 'trigger': 'low',      'dest': 'off' },
         { 'source': 'off', 'trigger': 'critical', 'dest': 'off' },
         { 'source': 'off', 'trigger': 'tick',     'dest': 'off' },
         { 'source': 'off', 'trigger': 'hot',      'dest': 'hot' },
         { 'source': 'off', 'trigger': 'cold',     'dest': 'off' },
 
+        { 'source': 'starting circulation pump', 'trigger': 'full',     'dest': 'starting circulation pump' },
+        { 'source': 'starting circulation pump', 'trigger': 'low',      'dest': 'starting circulation pump' },
+        { 'source': 'starting circulation pump', 'trigger': 'critical', 'dest': 'off',                       'after': ['cancel_timer', 'turn_heat_pump_off'] },
+        { 'source': 'starting circulation pump', 'trigger': 'tick',     'dest': 'starting circulation pump' },
+        { 'source': 'starting circulation pump', 'trigger': 'hot',      'dest': 'hot',                       'after': ['cancel_timer', 'turn_heat_pump_off'] },
+        { 'source': 'starting circulation pump', 'trigger': 'cold',     'dest': 'starting circulation pump' },
+        { 'source': 'starting circulation pump', 'trigger': 'timeout',  'dest': 'on',                        'after': ['turn_circulation_pump_on'] },
+
         { 'source': 'on',  'trigger': 'full',     'dest': 'on' },
-        { 'source': 'on',  'trigger': 'low',      'dest': 'waiting before stopping',       'after': 'set_low_battery_timer' },
-        { 'source': 'on',  'trigger': 'critical', 'dest': 'stopping circulation pump low', 'after': 'turn_heat_pump_off' },
+        { 'source': 'on',  'trigger': 'low',      'dest': 'waiting before stopping',       'after': ['set_low_battery_timer'] },
+        { 'source': 'on',  'trigger': 'critical', 'dest': 'stopping circulation pump low', 'after': ['turn_heat_pump_off', 'set_circulation_delay_timer'] },
         { 'source': 'on',  'trigger': 'tick',     'dest': 'on' },
-        { 'source': 'on',  'trigger': 'hot',      'dest': 'stopping circulation pump hot', 'after': 'turn_heat_pump_off' },
+        { 'source': 'on',  'trigger': 'hot',      'dest': 'stopping circulation pump hot', 'after': ['turn_heat_pump_off', 'set_circulation_delay_timer'] },
         { 'source': 'on',  'trigger': 'cold',     'dest': 'on' },
 
-        { 'source': 'waiting before stopping', 'trigger': 'full',     'dest': 'on', 'after': 'cancel_timer' },
+        { 'source': 'waiting before stopping', 'trigger': 'full',     'dest': 'on',                            'after': ['cancel_timer'] },
         { 'source': 'waiting before stopping', 'trigger': 'low',      'dest': 'waiting before stopping' },
-        { 'source': 'waiting before stopping', 'trigger': 'critical', 'dest': 'stopping circulation pump low', 'after': 'turn_heat_pump_off' },
-        { 'source': 'waiting before stopping', 'trigger': 'tick',     'dest': 'on', 'after': 'cancel_timer' },
-        { 'source': 'waiting before stopping', 'trigger': 'hot',      'dest': 'stopping circulation pump hot', 'after': 'turn_heat_pump_off' },
+        { 'source': 'waiting before stopping', 'trigger': 'critical', 'dest': 'stopping circulation pump low', 'after': ['turn_heat_pump_off', 'set_circulation_delay_timer'] },
+        { 'source': 'waiting before stopping', 'trigger': 'tick',     'dest': 'on',                            'after': ['cancel_timer'] },
+        { 'source': 'waiting before stopping', 'trigger': 'hot',      'dest': 'stopping circulation pump hot', 'after': ['turn_heat_pump_off', 'set_circulation_delay_timer'] },
         { 'source': 'waiting before stopping', 'trigger': 'cold',     'dest': 'waiting before stopping' },
-        { 'source': 'waiting before stopping', 'trigger': 'timeout',  'dest': 'stopping circulation pump low', 'after': 'turn_heat_pump_off' },
+        { 'source': 'waiting before stopping', 'trigger': 'timeout',  'dest': 'stopping circulation pump low', 'after': ['turn_heat_pump_off', 'set_circulation_delay_timer'] },
 
         { 'source': 'stopping circulation pump low', 'trigger': 'full',     'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'low',      'dest': 'stopping circulation pump low' },
@@ -66,7 +76,7 @@ class esmartfsm(object):
         { 'source': 'stopping circulation pump low', 'trigger': 'tick',     'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'hot',      'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'cold',     'dest': 'stopping circulation pump low' },
-        { 'source': 'stopping circulation pump low', 'trigger': 'timeout',  'dest': 'waiting before restart low', 'after': 'turn_circulation_pump_off' },
+        { 'source': 'stopping circulation pump low', 'trigger': 'timeout',  'dest': 'waiting before restart low', 'after': ['turn_circulation_pump_off'] },
 
         { 'source': 'waiting before restart low',    'trigger': 'full',     'dest': 'waiting before restart low' },
         { 'source': 'waiting before restart low',    'trigger': 'low',      'dest': 'waiting before restart low' },
@@ -82,7 +92,7 @@ class esmartfsm(object):
         { 'source': 'stopping circulation pump hot', 'trigger': 'tick',     'dest': 'stopping circulation pump hot' },
         { 'source': 'stopping circulation pump hot', 'trigger': 'hot',      'dest': 'stopping circulation pump hot' },
         { 'source': 'stopping circulation pump hot', 'trigger': 'cold',     'dest': 'stopping circulation pump hot' },
-        { 'source': 'stopping circulation pump hot', 'trigger': 'timeout',  'dest': 'waiting before restart hot', 'after': 'turn_circulation_pump_off' },
+        { 'source': 'stopping circulation pump hot', 'trigger': 'timeout',  'dest': 'waiting before restart hot', 'after': ['turn_circulation_pump_off'] },
 
         { 'source': 'waiting before restart hot',    'trigger': 'full',     'dest': 'waiting before restart hot' },
         { 'source': 'waiting before restart hot',    'trigger': 'low',      'dest': 'waiting before restart hot' },
@@ -101,16 +111,16 @@ class esmartfsm(object):
     ]
 
     def __init__(self):
+        self.piface = pifacedigitalio.PiFaceDigital()
+        self.piface.relays[HEAT_PUMP_RELAY].value = 0
+        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+
+        self.heattrap = serial.Serial(HEATTRAP, baudrate=9600, timeout=0)
+
         self.esmart = esmart.esmart()
         self.esmart.connect((ESMART_HOST, ESMART_PORT))
 
-
         self.machine = Machine(model=self, states=esmartfsm.states, transitions=esmartfsm.transitions, initial='off')
-        self.heattrap = serial.Serial(HEATTRAP, baudrate=9600, timeout=0)
-        self.piface = pifacedigitalio.PiFaceDigital()
-
-        self.piface.relays[HEAT_PUMP_RELAY].value = 0
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
 
         self.line = bytearray()
         self.ticker = 0
@@ -118,7 +128,7 @@ class esmartfsm(object):
 
     def request_data(self):
         if self.timer and time.time() >= self.timer:
-            print("DELAY EXPIRED", flush=True)
+            print('DELAY EXPIRED', flush=True)
             self.timer = None
             self.timeout()
         else:
@@ -147,7 +157,7 @@ class esmartfsm(object):
 
             self.ticker -= time.time() - timebefore
             if tempsensors:
-                print(tempsensors, flush=True)
+                print('TEMP SENSORS', tempsensors, flush=True)
                 if tempsensors[1] >= HOT_DEGREES:
                     self.hot()
                 elif tempsensors[1] <= COLD_DEGREES:
@@ -177,41 +187,55 @@ class esmartfsm(object):
 
                     self.ticker = TICK_SECS
 
-
-    def turn_pumps_on(self):
-        print("TURN PUMP ON", flush=True)
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 1
+    def turn_heat_pump_on(self):
+        print('TURN HEAT PUMP ON', flush=True)
         self.piface.relays[HEAT_PUMP_RELAY].value = 1
 
-    def turn_heat_pump_off(self):
-        print("TURN HEAT PUMP OFF", flush=True)
-        self.piface.relays[HEAT_PUMP_RELAY].value = 0
+    def set_circulation_delay_timer(self):
+        print('SET CIRCULATION DELAY TIMER', flush=True)
         self.timer = time.time() + CIRCULATION_DELAY_SECS
 
+    def turn_heat_pump_off(self):
+        print('TURN HEAT PUMP OFF', flush=True)
+        self.piface.relays[HEAT_PUMP_RELAY].value = 0
+
     def turn_circulation_pump_off(self):
-        print("TURN CIRCULATION PUMP OFF", flush=True)
+        print('TURN CIRCULATION PUMP OFF', flush=True)
         self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+
+    def set_restart_delay_timer(self):
+        print('SET RESTART DELAY TIMER', flush=True)
         self.timer = time.time() + RESTART_DELAY_SECS
 
+    def turn_circulation_pump_on(self):
+        print('TURN CIRCULATION PUMP ON', flush=True)
+        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+
     def set_low_battery_timer(self):
-        print("SETTING LOW BATTERY TIMEOUT", flush=True)
+        print('SET LOW BATTERY TIMER', flush=True)
         self.timer = time.time() + LOW_BATTERY_TIMEOUT
 
     def cancel_timer(self):
+        print('CANCELLING TIMER', flush=True)
         self.timer = None
 
-def sigint_handler(sig, frame):
-    print('EXIT', flush=True)
-    self.piface.relays[HEAT_PUMP_RELAY].value = 0
-    self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, sigint_handler)
-fsm = esmartfsm()
-try:
-    while True:
+fsm = None
+while True:
+    try:
+        if not fsm:
+            fsm = esmartfsm()
         fsm.request_data()
-except:
-    print('EXCEPTION', flush=True)
-    fsm.piface.relays[HEAT_PUMP_RELAY].value = 0
-    fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+
+    except Exception as exception:
+        if fsm:
+            fsm.piface.relays[HEAT_PUMP_RELAY].value = 0
+            fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+            del(fsm)
+            fsm = None
+        if isinstance(exception, ConnectionRefusedError) or isinstance(exception, esmart.esmartError):
+            print(exception, flush=True)
+            print('SLEEPING BEFORE RETRYING')
+            time.sleep(RETRY_SLEEP_SECS)
+            continue
+        else:
+            raise
