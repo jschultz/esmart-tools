@@ -38,7 +38,7 @@ ESMART_HOST='containerpi.local'
 ESMART_PORT=8888
 
 class esmartfsm(object):
-    states  = ['off', 'on', 'waiting before stopping', 'stopping circulation pump low', 'waiting before restart low', 'stopping circulation pump hot', 'waiting before restart hot', 'hot']
+    states  = ['off', 'on', 'starting circulation pump', 'waiting before stopping', 'stopping circulation pump low', 'waiting before restart low', 'stopping circulation pump hot', 'waiting before restart hot', 'hot']
     transitions = [
         { 'source': 'off', 'trigger': 'full',     'dest': 'starting circulation pump', 'after': ['turn_heat_pump_on', 'set_circulation_delay_timer'] },
         { 'source': 'off', 'trigger': 'low',      'dest': 'off' },
@@ -195,6 +195,10 @@ class esmartfsm(object):
         print('SET CIRCULATION DELAY TIMER', flush=True)
         self.timer = time.time() + CIRCULATION_DELAY_SECS
 
+    def turn_circulation_pump_on(self):
+        print('TURN CIRCULATION PUMP ON', flush=True)
+        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 1
+
     def turn_heat_pump_off(self):
         print('TURN HEAT PUMP OFF', flush=True)
         self.piface.relays[HEAT_PUMP_RELAY].value = 0
@@ -206,10 +210,6 @@ class esmartfsm(object):
     def set_restart_delay_timer(self):
         print('SET RESTART DELAY TIMER', flush=True)
         self.timer = time.time() + RESTART_DELAY_SECS
-
-    def turn_circulation_pump_on(self):
-        print('TURN CIRCULATION PUMP ON', flush=True)
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
 
     def set_low_battery_timer(self):
         print('SET LOW BATTERY TIMER', flush=True)
@@ -232,10 +232,9 @@ while True:
             fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
             del(fsm)
             fsm = None
-        if isinstance(exception, ConnectionRefusedError) or isinstance(exception, esmart.esmartError):
-            print(exception, flush=True)
-            print('SLEEPING BEFORE RETRYING')
-            time.sleep(RETRY_SLEEP_SECS)
-            continue
-        else:
-            raise
+
+        print(traceback.format_exc(), flush=True)
+        print(exception, flush=True)
+        print('SLEEPING BEFORE RETRYING')
+        time.sleep(RETRY_SLEEP_SECS)
+        continue
