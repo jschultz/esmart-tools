@@ -161,11 +161,18 @@ class esmartfsm(object):
 
             self.ticker -= time.time() - timebefore
             if tempsensors:
-                logging.info('TEMP SENSORS %s' % (tempsensors))
+
+                def log_temp_sensors(status):
+                    logging.info('Temperature sensors: %s - %s' % (tempsensors, status))
+
                 if tempsensors[1] >= HOT_DEGREES:
+                    log_temp_sensors('HOT')
                     self.hot()
                 elif tempsensors[1] <= COLD_DEGREES:
+                    log_temp_sensors('COLD')
                     self.cold()
+                else:
+                    log_temp_sensors('')
             else:
                 if self.ticker <= 0:
                     data = self.esmart.read()
