@@ -76,7 +76,7 @@ class esmartfsm(object):
         { 'source': 'stopping circulation pump low', 'trigger': 'tick',     'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'hot',      'dest': 'stopping circulation pump low' },
         { 'source': 'stopping circulation pump low', 'trigger': 'cold',     'dest': 'stopping circulation pump low' },
-        { 'source': 'stopping circulation pump low', 'trigger': 'timeout',  'dest': 'waiting before restart low', 'after': ['turn_circulation_pump_off'] },
+        { 'source': 'stopping circulation pump low', 'trigger': 'timeout',  'dest': 'waiting before restart low', 'after': ['turn_circulation_pump_off', 'set_restart_delay_timer'] },
 
         { 'source': 'waiting before restart low',    'trigger': 'full',     'dest': 'waiting before restart low' },
         { 'source': 'waiting before restart low',    'trigger': 'low',      'dest': 'waiting before restart low' },
@@ -92,7 +92,7 @@ class esmartfsm(object):
         { 'source': 'stopping circulation pump hot', 'trigger': 'tick',     'dest': 'stopping circulation pump hot' },
         { 'source': 'stopping circulation pump hot', 'trigger': 'hot',      'dest': 'stopping circulation pump hot' },
         { 'source': 'stopping circulation pump hot', 'trigger': 'cold',     'dest': 'stopping circulation pump hot' },
-        { 'source': 'stopping circulation pump hot', 'trigger': 'timeout',  'dest': 'waiting before restart hot', 'after': ['turn_circulation_pump_off'] },
+        { 'source': 'stopping circulation pump hot', 'trigger': 'timeout',  'dest': 'waiting before restart hot', 'after': ['turn_circulation_pump_off', 'set_restart_delay_timer'] },
 
         { 'source': 'waiting before restart hot',    'trigger': 'full',     'dest': 'waiting before restart hot' },
         { 'source': 'waiting before restart hot',    'trigger': 'low',      'dest': 'waiting before restart hot' },
