@@ -13,6 +13,7 @@ import select
 import time
 import pifacedigitalio
 import traceback
+import logging
 
 thermregexp = re.compile(r"THx,\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+)")
 
@@ -36,6 +37,9 @@ CIRCULATION_PUMP_RELAY = 0
 
 ESMART_HOST='containerpi.local'
 ESMART_PORT=8888
+
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.getLogger('transitions').setLevel(logging.WARNING)  # Set to INFO to see transitions logging
 
 class esmartfsm(object):
     states  = ['off', 'on', 'starting circulation pump', 'waiting before stopping', 'stopping circulation pump low', 'waiting before restart low', 'stopping circulation pump hot', 'waiting before restart hot', 'hot']
@@ -128,7 +132,7 @@ class esmartfsm(object):
 
     def request_data(self):
         if self.timer and time.time() >= self.timer:
-            print('DELAY EXPIRED', flush=True)
+            logging.info('DELAY EXPIRED')
             self.timer = None
             self.timeout()
         else:
@@ -157,7 +161,7 @@ class esmartfsm(object):
 
             self.ticker -= time.time() - timebefore
             if tempsensors:
-                print('TEMP SENSORS', tempsensors, flush=True)
+                logging.info('TEMP SENSORS %s' % (tempsensors))
                 if tempsensors[1] >= HOT_DEGREES:
                     self.hot()
                 elif tempsensors[1] <= COLD_DEGREES:
@@ -167,56 +171,55 @@ class esmartfsm(object):
                     data = self.esmart.read()
 
                     charge_mode = esmart.DEVICE_MODE[data['chg_mode']]
-                    time_now = datetime.datetime.now().replace(microsecond=0).isoformat()
 
-                    def print_charge_status(status):
-                        print('%s Charge mode: %s Battery %.1fV %.1fA - %s' % (time_now, charge_mode, data['bat_volt'], data['chg_cur'], status), flush=True)
+                    def log_charge_status(status):
+                        logging.info('Charge mode: %s Battery %.1fV %.1fA - %s' % (charge_mode, data['bat_volt'], data['chg_cur'], status))
 
                     if ( charge_mode == 'CV' or data['bat_volt'] >= FULL_VOLT ) and data['chg_cur'] < FULL_CUR:
-                        print_charge_status('FULL')
+                        log_charge_status('FULL')
                         self.full()
                     elif data['bat_volt'] < CRITICAL_VOLT:
-                        print_charge_status('CRITICAL')
+                        log_charge_status('CRITICAL')
                         self.critical()
                     elif data['bat_volt'] < LOW_VOLT:
-                        print_charge_status('LOW')
+                        log_charge_status('LOW')
                         self.low()
                     else:
-                        print_charge_status('TICK')
+                        log_charge_status('TICK')
                         self.tick()
 
                     self.ticker = TICK_SECS
 
     def turn_heat_pump_on(self):
-        print('TURN HEAT PUMP ON', flush=True)
+        logging.info('TURN HEAT PUMP ON')
         self.piface.relays[HEAT_PUMP_RELAY].value = 1
 
     def set_circulation_delay_timer(self):
-        print('SET CIRCULATION DELAY TIMER', flush=True)
+        logging.info('SET CIRCULATION DELAY TIMER')
         self.timer = time.time() + CIRCULATION_DELAY_SECS
 
     def turn_circulation_pump_on(self):
-        print('TURN CIRCULATION PUMP ON', flush=True)
+        logging.info('TURN CIRCULATION PUMP ON')
         self.piface.relays[CIRCULATION_PUMP_RELAY].value = 1
 
     def turn_heat_pump_off(self):
-        print('TURN HEAT PUMP OFF', flush=True)
+        logging.info('TURN HEAT PUMP OFF')
         self.piface.relays[HEAT_PUMP_RELAY].value = 0
 
     def turn_circulation_pump_off(self):
-        print('TURN CIRCULATION PUMP OFF', flush=True)
+        logging.info('TURN CIRCULATION PUMP OFF')
         self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
 
     def set_restart_delay_timer(self):
-        print('SET RESTART DELAY TIMER', flush=True)
+        logging.info('SET RESTART DELAY TIMER')
         self.timer = time.time() + RESTART_DELAY_SECS
 
     def set_low_battery_timer(self):
-        print('SET LOW BATTERY TIMER', flush=True)
+        logging.info('SET LOW BATTERY TIMER')
         self.timer = time.time() + LOW_BATTERY_TIMEOUT
 
     def cancel_timer(self):
-        print('CANCELLING TIMER', flush=True)
+        logging.info('CANCELLING TIMER')
         self.timer = None
 
 fsm = None
@@ -233,8 +236,8 @@ while True:
             del(fsm)
             fsm = None
 
-        print(traceback.format_exc(), flush=True)
-        print(exception, flush=True)
-        print('SLEEPING BEFORE RETRYING')
+        logging.info(traceback.format_exc())
+        logging.info(exception)
+        logging.info('SLEEPING BEFORE RETRYING')
         time.sleep(RETRY_SLEEP_SECS)
         continue
