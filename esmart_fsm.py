@@ -2,20 +2,18 @@
 # -*- coding: utf-8 -*-
 
 import esmart
+import heattrap
 import time
 import datetime
 from transitions import Machine
-import signal
 import sys
-import serial
 import re
-import select
-import time
-import pifacedigitalio
 import traceback
 import logging
-
-thermregexp = re.compile(r"THx,\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+),\s*(\S+)")
+try:
+    import pifacedigitalio
+except ModuleNotFoundError:
+    pass
 
 TICK_SECS = 5
 FULL_VOLT = 28.4
@@ -29,14 +27,13 @@ RETRY_SLEEP_SECS = 30
 HOT_DEGREES = 50
 COLD_DEGREES = 45
 
-HEATTRAP = "/dev/ttyACM0"
-EOLCHARS = b'\r\n'
-
 HEAT_PUMP_RELAY = 1
 CIRCULATION_PUMP_RELAY = 0
 
 ESMART_HOST='containerpi.local'
 ESMART_PORT=8888
+
+HEATTRAP_PORT = "/dev/ttyACM0"
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.getLogger('transitions').setLevel(logging.WARNING)  # Set to INFO to see transitions logging
@@ -115,11 +112,13 @@ class esmartfsm(object):
     ]
 
     def __init__(self):
-        self.piface = pifacedigitalio.PiFaceDigital()
-        self.piface.relays[HEAT_PUMP_RELAY].value = 0
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
 
-        self.heattrap = serial.Serial(HEATTRAP, baudrate=9600, timeout=0)
+        self.piface = pifacedigitalio.PiFaceDigital() if 'pifacedigitalio' in sys.modules else None
+
+        self.turn_heat_pump_off()
+        self.turn_circulation_pump_off()
+
+        self.heattrap = heattrap.heattrap(HEATTRAP_PORT)
 
         self.esmart = esmart.esmart()
         self.esmart.connect((ESMART_HOST, ESMART_PORT))
@@ -137,28 +136,7 @@ class esmartfsm(object):
             self.timeout()
         else:
             timebefore = time.time()
-            readable, writable, exceptional = select.select([self.heattrap], [], [], self.ticker)
-
-            tempsensors = None
-            if readable:
-                c = self.heattrap.read(1)
-                while c:
-                    if c in EOLCHARS:
-                        try:
-                            linematch = thermregexp.match(self.line.decode('utf-8'))
-
-                        except UnicodeDecodeError:
-                            linematch = None
-                            pass
-                        if linematch:
-                            tempsensors = [int(linematch.group(i)) for i in [2,3,8]]
-
-                        self.line = bytearray()
-                    else:
-                        self.line += c
-
-                    c = self.heattrap.read(1)
-
+            tempsensors = self.heattrap.read(self.ticker)
             self.ticker -= time.time() - timebefore
             if tempsensors:
 
@@ -199,7 +177,8 @@ class esmartfsm(object):
 
     def turn_heat_pump_on(self):
         logging.info('TURN HEAT PUMP ON')
-        self.piface.relays[HEAT_PUMP_RELAY].value = 1
+        if self.piface:
+            self.piface.relays[HEAT_PUMP_RELAY].value = 1
 
     def set_circulation_delay_timer(self):
         logging.info('SET CIRCULATION DELAY TIMER')
@@ -207,19 +186,22 @@ class esmartfsm(object):
 
     def turn_circulation_pump_on(self):
         logging.info('TURN CIRCULATION PUMP ON')
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 1
+        if self.piface:
+            self.piface.relays[CIRCULATION_PUMP_RELAY].value = 1
 
     def turn_heat_pump_off(self):
         logging.info('TURN HEAT PUMP OFF')
-        self.piface.relays[HEAT_PUMP_RELAY].value = 0
+        if self.piface:
+            self.piface.relays[HEAT_PUMP_RELAY].value = 0
 
     def turn_circulation_pump_off(self):
         logging.info('TURN CIRCULATION PUMP OFF')
-        self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+        if self.piface:
+            self.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
 
     def set_restart_delay_timer(self):
         logging.info('SET RESTART DELAY TIMER')
-        self.timer = time.time() + RESTART_DELAY_SECS
+        #self.timer = time.time() + RESTART_DELAY_SECS
 
     def set_low_battery_timer(self):
         logging.info('SET LOW BATTERY TIMER')
@@ -238,8 +220,10 @@ while True:
 
     except Exception as exception:
         if fsm:
-            fsm.piface.relays[HEAT_PUMP_RELAY].value = 0
-            fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+            fsm.turn_heat_pump_off()
+            fsm.turn_circulation_pump_off()
+            #fsm.piface.relays[HEAT_PUMP_RELAY].value = 0
+            #fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
             del(fsm)
             fsm = None
 

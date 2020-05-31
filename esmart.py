@@ -1,8 +1,17 @@
 # Library for communicating with eSmart 3 MPPT charger
+# Copyright 2020 Jonathan Schultz
 # skagmo.com, 2018
 
-import struct, time, serial, socket, requests
-#from collections import namedtuple
+#import struct, time, serial, socket, requests
+import importlib, time, sys
+try:
+    import serial
+except ModuleNotFoundError:
+    pass
+try:
+    import socket
+except ModuleNotFoundError:
+    pass
 
 # States
 STATE_START = 0
@@ -19,7 +28,6 @@ class esmartError(Exception):
 
 class esmart:
     def __init__(self):
-        self.state = STATE_START
         self.serial = None
         self.port = ""
         self.timeout = 0
@@ -28,16 +36,19 @@ class esmart:
     def __del__(self):
         self.close()
 
-    def set_callback(self, function):
-        self.callback = function
-
     def open(self, port):
-        self.serial = serial.Serial(port,9600,timeout=0.1)
-        self.port = port
+        if 'serial' in sys.modules:
+            self.serial = serial.Serial(port,9600,timeout=0.1)
+            self.port = port
+        else:
+            raise esmartError("Missing module: serial")
 
     def connect(self, address):
-        self.socket = socket.create_connection(address)
-        self.address = address
+        if 'socket' in sys.modules:
+            self.socket = socket.create_connection(address)
+            self.address = address
+        else:
+            raise esmartError("Missing module: socket")
 
     def close(self):
         try:
