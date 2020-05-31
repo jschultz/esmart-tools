@@ -125,7 +125,6 @@ class esmartfsm(object):
 
         self.machine = Machine(model=self, states=esmartfsm.states, transitions=esmartfsm.transitions, initial='off')
 
-        self.line = bytearray()
         self.ticker = 0
         self.timer = None
 
@@ -212,6 +211,7 @@ class esmartfsm(object):
         self.timer = None
 
 fsm = None
+logging.info('STARTING DAEMON')
 while True:
     try:
         if not fsm:

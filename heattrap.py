@@ -1,7 +1,7 @@
 # Library for communicating with Heat Trap hot water system
 # Copyright 2020 Jonathan Schultz
 
-import re, sys, time
+import re, sys, time, select
 try:
     import serial
 except ModuleNotFoundError:
@@ -17,7 +17,8 @@ class heattrapError(Exception):
 
 class heattrap:
     def __init__(self, port):
-        self.serial = serial.Serial(HEATTRAP, baudrate=9600, timeout=0) if 'serial' in sys.modules else None
+        self.serial = serial.Serial(port, baudrate=9600, timeout=0) if 'serial' in sys.modules else None
+        self.line = bytearray()
 
     def __del__(self):
         self.close()
