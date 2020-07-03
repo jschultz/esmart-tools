@@ -200,7 +200,7 @@ class esmartfsm(object):
 
     def set_restart_delay_timer(self):
         logging.info('SET RESTART DELAY TIMER')
-        #self.timer = time.time() + RESTART_DELAY_SECS
+        self.timer = time.time() + RESTART_DELAY_SECS
 
     def set_low_battery_timer(self):
         logging.info('SET LOW BATTERY TIMER')
