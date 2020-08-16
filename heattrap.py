@@ -34,7 +34,7 @@ class heattrap:
     def read(self, timeout):
         tempsensors = None
         if self.serial:
-            readable, writable, exceptional = select.select([self.serial], [], [], timeout)
+            readable, writable, exceptional = select.select([self.serial], [], [], max(timeout, 0))
 
             if readable:
                 c = self.serial.read(1)
