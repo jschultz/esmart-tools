@@ -17,6 +17,7 @@ except ModuleNotFoundError:
 
 TICK_SECS = 5
 FULL_VOLT = 28.4
+FULL_VOLT_CV = 27.6
 FULL_CUR = 20
 LOW_VOLT = 24.8
 CRITICAL_VOLT = 24.0
@@ -159,7 +160,7 @@ class esmartfsm(object):
                     def log_charge_status(status):
                         logging.info('Charge mode: %s Battery %.1fV %.1fA - %s' % (charge_mode, data['bat_volt'], data['chg_cur'], status))
 
-                    if ( charge_mode == 'CV' or data['bat_volt'] >= FULL_VOLT ) and data['chg_cur'] < FULL_CUR:
+                    if ( ( charge_mode == 'CV' and data['bat_volt'] >= FULL_VOLT_CV ) or data['bat_volt'] >= FULL_VOLT ) and data['chg_cur'] < FULL_CUR:
                         log_charge_status('FULL')
                         self.full()
                     elif data['bat_volt'] < CRITICAL_VOLT:
