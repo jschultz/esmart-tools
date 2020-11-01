@@ -13,9 +13,15 @@ import queue
 
 HOST=''
 PORT=8888
-ESMART="/dev/ttyUSB0"
+ESMART="/dev/ttyUSB{}"
 
-ser = serial.Serial(ESMART,9600,timeout=0.1)
+n = 0
+while n < 10:
+    try:
+        ser = serial.Serial(ESMART.format(n),9600,timeout=0.1)
+        break
+    except serial.serialutil.SerialException:
+        n += 1
 
 server = socket.socket()
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
