@@ -65,15 +65,18 @@ class esmart:
         try:
             if self.serial:
                 self.serial.write(REQUEST_MSG0)
-                data = self.serial.read(100)
+                data = self.serial.read(1024)
             elif self.socket:
                 self.socket.send(REQUEST_MSG0)
-                data = self.socket.recv(100)
+                data = self.socket.recv(1024)
 
-            if len(data) == 0:
+            print("Read: ", [hex(data[idx]) for idx in range(len(data))])
+            idx = data.find(0xaa)
+            if idx == -1:
                 raise esmartError("No data from eSmart device")
+            data = data[idx:]
             if (data[0] != 0xaa):
-                raise esmartError("Incorrect start character")
+                raise esmartError("Incorrect start character: ", [hex(data[idx]) for idx in range(len(data))])
             if (data[3] != 3):
                 raise esmartError("Source is not MPPT device")
             if (data[4] != 0):

@@ -15,23 +15,26 @@ try:
 except ModuleNotFoundError:
     pass
 
+# 48V setup
+CELLS = 24
+
 TICK_SECS = 5
-FULL_VOLT = 28.4
-FULL_VOLT_CV = 27.6
-FULL_CUR = 25
-LOW_VOLT = 24.8
-CRITICAL_VOLT = 24.0
+FULL_VOLT = 14.2
+FULL_VOLT_CV = 13.8
+FULL_POWER = 600
+LOW_VOLT = 12.4
+CRITICAL_VOLT = 12.0
 LOW_BATTERY_TIMEOUT = 120
 CIRCULATION_DELAY_SECS = 30
 RESTART_DELAY_SECS = 300
 RETRY_SLEEP_SECS = 30
-HOT_DEGREES = 50
-COLD_DEGREES = 45
+HOT_DEGREES = 55
+COLD_DEGREES = 54
 
 HEAT_PUMP_RELAY = 1
 CIRCULATION_PUMP_RELAY = 0
 
-ESMART_HOST='containerpi.local'
+ESMART_HOST='containerpi4.local'
 ESMART_PORT=8888
 
 HEATTRAP_PORT = "/dev/ttyACM0"
@@ -154,19 +157,20 @@ class esmartfsm(object):
             else:
                 if self.ticker <= 0:
                     data = self.esmart.read()
+                    print(data)
 
                     charge_mode = esmart.DEVICE_MODE[data['chg_mode']]
 
                     def log_charge_status(status):
                         logging.info('Charge mode: %s Battery %.1fV %.1fA - %s' % (charge_mode, data['bat_volt'], data['chg_cur'], status))
 
-                    if ( ( charge_mode == 'CV' and data['bat_volt'] >= FULL_VOLT_CV ) or data['bat_volt'] >= FULL_VOLT ) and data['chg_cur'] < FULL_CUR:
+                    if ( ( charge_mode == 'CV' and data['bat_volt'] >= FULL_VOLT_CV * CELLS / 6 ) or data['bat_volt'] >= FULL_VOLT * CELLS / 6 ) and data['chg_cur'] < FULL_POWER / (CELLS * 2.0):
                         log_charge_status('FULL')
                         self.full()
-                    elif data['bat_volt'] < CRITICAL_VOLT:
+                    elif data['bat_volt'] < CRITICAL_VOLT * CELLS / 6:
                         log_charge_status('CRITICAL')
                         self.critical()
-                    elif data['bat_volt'] < LOW_VOLT:
+                    elif data['bat_volt'] < LOW_VOLT * CELLS / 6:
                         log_charge_status('LOW')
                         self.low()
                     else:
