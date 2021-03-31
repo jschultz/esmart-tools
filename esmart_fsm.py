@@ -21,9 +21,9 @@ CELLS = 24
 TICK_SECS = 5
 FULL_VOLT = 14.2
 FULL_VOLT_CV = 13.8
-FULL_POWER = 600
-LOW_VOLT = 12.4
-CRITICAL_VOLT = 12.0
+FULL_POWER = 1200
+LOW_VOLT = 13
+CRITICAL_VOLT = 12.5
 LOW_BATTERY_TIMEOUT = 120
 CIRCULATION_DELAY_SECS = 30
 RESTART_DELAY_SECS = 300
@@ -34,7 +34,8 @@ COLD_DEGREES = 54
 HEAT_PUMP_RELAY = 1
 CIRCULATION_PUMP_RELAY = 0
 
-ESMART_HOST='containerpi4.local'
+#ESMART_HOST='containerpi4.local'
+ESMART_HOST='192.168.8.104'
 ESMART_PORT=8888
 
 HEATTRAP_PORT = "/dev/ttyACM0"
@@ -156,8 +157,17 @@ class esmartfsm(object):
                     log_temp_sensors('')
             else:
                 if self.ticker <= 0:
-                    data = self.esmart.read()
-                    print(data)
+                    n = 10
+                    while n > 0:
+                        try:
+                            data = self.esmart.read()
+                            break
+                        except esmartError as exception:
+                            logging.info(exception)
+                            n -= 1
+                            
+                    if n == 0:
+                        raise RuntimeError('Too many eSmart errors.')
 
                     charge_mode = esmart.DEVICE_MODE[data['chg_mode']]
 
@@ -227,8 +237,7 @@ while True:
         if fsm:
             fsm.turn_heat_pump_off()
             fsm.turn_circulation_pump_off()
-            #fsm.piface.relays[HEAT_PUMP_RELAY].value = 0
-            #fsm.piface.relays[CIRCULATION_PUMP_RELAY].value = 0
+            del(fsm.piface)
             del(fsm)
             fsm = None
 

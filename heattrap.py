@@ -31,10 +31,10 @@ class heattrap:
         except AttributeError:
             pass
 
-    def read(self, timeout):
+    def read(self, timeout=None):
         tempsensors = None
         if self.serial:
-            readable, writable, exceptional = select.select([self.serial], [], [], max(timeout, 0))
+            readable, writable, exceptional = select.select([self.serial], [], [], timeout)
 
             if readable:
                 c = self.serial.read(1)

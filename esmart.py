@@ -70,7 +70,7 @@ class esmart:
                 self.socket.send(REQUEST_MSG0)
                 data = self.socket.recv(1024)
 
-            print("Read: ", [hex(data[idx]) for idx in range(len(data))])
+            #print("Read: ", [hex(data[idx]) for idx in range(len(data))])
             idx = data.find(0xaa)
             if idx == -1:
                 raise esmartError("No data from eSmart device")
