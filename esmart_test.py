@@ -3,12 +3,16 @@
 #
 # eSmart USB to TCP server
 #
-# Copyright (2019) Jonathan Schultz
+# Copyright (2020) Jonathan Schultz
 #
 
+import sys
 import esmart
 
-ESMART_PORT='/dev/ttyUSB0'
+if len(sys.argv) > 1:
+    ESMART_PORT=sys.argv[1]
+else:
+    ESMART_PORT = '/dev/ttyUSB1'
 
 esmart = esmart.esmart()
 esmart.open(ESMART_PORT)
