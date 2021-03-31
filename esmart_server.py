@@ -16,12 +16,15 @@ PORT=8888
 ESMART="/dev/ttyUSB{}"
 
 n = 0
-while n < 10:
+while True:
     try:
-        ser = serial.Serial(ESMART.format(n),9600,timeout=0.1)
+        serdevice = ESMART.format(n)
+        ser = serial.Serial(serdevice, 9600, timeout=0.1)
         break
     except serial.serialutil.SerialException:
         n += 1
+        if n == 10: # Arbitrary
+            raise RuntimeError('Can''t connect to eSmart.')
 
 server = socket.socket()
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -43,7 +46,14 @@ while inputs:
         else:
             data = s.recv(1024)
             if data:
-                ser.write(data)
+                try:
+                    ser.write(data)
+                except serial.serialutil.SerialException:
+                    # https://stackoverflow.com/questions/33441579/io-error-errno-5-with-long-term-serial-connection-in-python
+                    ser.close()
+                    ser = serial.Serial(serdevice, 9600, timeout=0.1)
+                    ser.write(data)
+
                 reply = ser.read(1024)
                 message_queues[s].put(reply)
                 if s not in outputs:
