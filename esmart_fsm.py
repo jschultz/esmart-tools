@@ -37,6 +37,7 @@ CIRCULATION_PUMP_RELAY = 0
 #ESMART_HOST='containerpi4.local'
 ESMART_HOST='192.168.8.104'
 ESMART_PORT=8888
+ESMART_TIMEOUT=5
 
 HEATTRAP_PORT = "/dev/ttyACM0"
 
@@ -142,6 +143,8 @@ class esmartfsm(object):
             timebefore = time.time()
             tempsensors = self.heattrap.read(self.ticker)
             self.ticker -= time.time() - timebefore
+            if self.ticker < 0:
+                self.ticker = 0
             if tempsensors:
 
                 def log_temp_sensors(status):
@@ -156,13 +159,13 @@ class esmartfsm(object):
                 else:
                     log_temp_sensors('')
             else:
-                if self.ticker <= 0:
+                if self.ticker == 0:
                     n = 10
                     while n > 0:
                         try:
-                            data = self.esmart.read()
+                            data = self.esmart.read(ESMART_TIMEOUT)
                             break
-                        except esmartError as exception:
+                        except esmart.esmartError as exception:
                             logging.info(exception)
                             n -= 1
                             

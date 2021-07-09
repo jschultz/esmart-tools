@@ -3,7 +3,7 @@
 # skagmo.com, 2018
 
 #import struct, time, serial, socket, requests
-import importlib, time, sys
+import importlib, time, sys, select
 try:
     import serial
 except ModuleNotFoundError:
@@ -46,6 +46,7 @@ class esmart:
     def connect(self, address):
         if 'socket' in sys.modules:
             self.socket = socket.create_connection(address)
+            self.socket.setblocking(0)
             self.address = address
         else:
             raise esmartError("Missing module: socket")
@@ -61,14 +62,18 @@ class esmart:
         except AttributeError:
             pass
 
-    def read(self):
+    def read(self, timeout=None):
         try:
             if self.serial:
                 self.serial.write(REQUEST_MSG0)
-                data = self.serial.read(1024)
+                ready = select.select([self.serial], [], [], timeout)
+                if ready[0]:
+                    data = self.serial.read(1024)
             elif self.socket:
                 self.socket.send(REQUEST_MSG0)
-                data = self.socket.recv(1024)
+                ready = select.select([self.socket], [], [], timeout)
+                if ready[0]:
+                    data = self.socket.recv(1024)
 
             #print("Read: ", [hex(data[idx]) for idx in range(len(data))])
             idx = data.find(0xaa)
