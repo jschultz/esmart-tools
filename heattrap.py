@@ -46,7 +46,7 @@ class heattrap:
                             linematch = None
                             pass
                         if linematch:
-                            tempsensors = [int(linematch.group(i)) for i in [2,3,8]]
+                            tempsensors = [int(linematch.group(i)) for i in [2,3,8,1]]
 
                         self.line = bytearray()
                     else:
