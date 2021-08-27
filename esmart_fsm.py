@@ -28,8 +28,8 @@ LOW_BATTERY_TIMEOUT = 120
 CIRCULATION_DELAY_SECS = 30
 RESTART_DELAY_SECS = 300
 RETRY_SLEEP_SECS = 30
-HOT_DEGREES = 55
-COLD_DEGREES = 54
+HOT_DEGREES = 59
+COLD_DEGREES = 57
 
 HEAT_PUMP_RELAY = 1
 CIRCULATION_PUMP_RELAY = 0
@@ -177,7 +177,10 @@ class esmartfsm(object):
                     def log_charge_status(status):
                         logging.info('Charge mode: %s Battery %.1fV %.1fA - %s' % (charge_mode, data['bat_volt'], data['chg_cur'], status))
 
-                    if ( ( charge_mode == 'CV' and data['bat_volt'] >= FULL_VOLT_CV * CELLS / 6 ) or data['bat_volt'] >= FULL_VOLT * CELLS / 6 ) and data['chg_cur'] < FULL_POWER / (CELLS * 2.0):
+                    if ( (     charge_mode == 'FLOAT' 
+                          or ( charge_mode == 'CV' and data['bat_volt'] >= FULL_VOLT_CV * CELLS / 6 ) 
+                          or                           data['bat_volt'] >= FULL_VOLT * CELLS / 6 ) 
+                    and data['chg_cur'] < FULL_POWER / (CELLS * 2.0) ):
                         log_charge_status('FULL')
                         self.full()
                     elif data['bat_volt'] < CRITICAL_VOLT * CELLS / 6:
