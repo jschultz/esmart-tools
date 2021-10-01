@@ -64,6 +64,7 @@ class esmart:
 
     def read(self, timeout=None):
         try:
+            data = None
             if self.serial:
                 self.serial.write(REQUEST_MSG0)
                 ready = select.select([self.serial], [], [], timeout)
@@ -76,10 +77,12 @@ class esmart:
                     data = self.socket.recv(1024)
 
             #print("Read: ", [hex(data[idx]) for idx in range(len(data))])
-            idx = data.find(0xaa)
+            idx = data.find(0xaa) if data else -1
             if idx == -1:
                 raise esmartError("No data from eSmart device")
             data = data[idx:]
+            if len(data) < 5:
+                raise esmartError("Insufficient data from eSmart device")
             if (data[0] != 0xaa):
                 raise esmartError("Incorrect start character: ", [hex(data[idx]) for idx in range(len(data))])
             if (data[3] != 3):
@@ -89,6 +92,9 @@ class esmart:
 
             fields = {}
             fields['chg_mode']   = int.from_bytes(data[8:10],  byteorder='little')
+            if fields['chg_mode'] < 0 or fields['chg_mode'] >= len(DEVICE_MODE):
+                raise esmartError("Charge mode out of range: ", str(fields['chg_mode']))
+            
             fields['pv_volt']    = int.from_bytes(data[10:12], byteorder='little') / 10.0
             fields['bat_volt']   = int.from_bytes(data[12:14], byteorder='little') / 10.0
             fields['chg_cur']    = int.from_bytes(data[14:16], byteorder='little') / 10.0
