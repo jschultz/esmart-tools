@@ -55,7 +55,17 @@ while inputs:
                 except (serial.serialutil.SerialException, OSError):
                     # https://stackoverflow.com/questions/33441579/io-error-errno-5-with-long-term-serial-connection-in-python
                     ser.close()
-                    ser = serial.Serial(serdevice, 9600, timeout=0.1)
+
+                    n = 0
+                    while True:
+                        try:
+                            ser = serial.Serial(serdevice, 9600, timeout=0.1)
+                            break
+                        except serial.serialutil.SerialException:
+                            n += 1
+                            if n == 10: # Arbitrary
+                                raise RuntimeError('Can''t connect to eSmart.')
+
                     ser.write(data)
 
                 reply = ser.read(1024)
