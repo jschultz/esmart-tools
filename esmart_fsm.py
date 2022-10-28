@@ -243,6 +243,7 @@ while True:
         if fsm:
             fsm.turn_heat_pump_off()
             fsm.turn_circulation_pump_off()
+            fsm.piface.deinit_board()
             del(fsm.piface)
             del(fsm)
             fsm = None
